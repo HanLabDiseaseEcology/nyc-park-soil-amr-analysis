@@ -47,3 +47,50 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# macOS system files
+.DS_Store
+**/.DS_Store
+.AppleDouble
+.LSOverride
+
+# macOS folder metadata
+.Spotlight-V100
+.Trashes
+._*
+
+# Data files
+*.csv
+
+# Excel files
+*.xls
+*.xlsx
+
+# Temporary Excel files
+~$*.xls
+~$*.xlsx
+
+# Generated figures and tables
+outputs/figures/*
+outputs/tables/*
+
+# Keep output folders in Git
+!outputs/figures/.gitkeep
+!outputs/tables/.gitkeep
+
+# Quarto output files
+*.html
+*.pdf
+*.docx
+
+# Quarto project folders
+.quarto/
+_freeze/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Logs
+*.log
