@@ -27,7 +27,8 @@ required_columns <- c(
   "park_code",
   "tube_number",
   "amr_gene",
-  "copies_per_microliter")
+  "copies_per_microliter",
+  "park_name")
 
 # 5. Clean key columns
 
@@ -38,7 +39,9 @@ main_df <- main_df %>%
     tube_number = str_to_upper(str_trim(as.character(tube_number))),
     amr_gene = str_to_upper(str_trim(as.character(amr_gene))),
     copies_per_microliter = as.numeric(copies_per_microliter),
-    text_on_bag = str_to_upper(str_trim(as.character(text_on_bag)))
+    text_on_bag = str_to_upper(str_trim(as.character(text_on_bag))),
+    park_name = str_to_upper(str_trim(as.character(park_name))),
+    sample_month = format(sample_date, "%Y-%m")
   )
 # 6. Identify controls and non regular soil samples
 # Control names used in the data:
@@ -53,13 +56,11 @@ main_df <- main_df %>%
   mutate(
     is_control = if_any(
       c(tube_number),
-      ~ .x %in% c("PC1000", "PC100", "NC")
-    ),
+      ~ .x %in% c("PC1000", "PC100", "NC")),
     
     is_rat_or_trash = if_any(
       c(park_code, text_on_bag),
-      ~ str_detect(.x, "RAT|TRASH|LANDFILL")
-    )
+      ~ str_detect(.x, "RAT|TRASH|LANDFILL"))
   )
 
 # 7. Keep only soil_chem samples that have all required data
@@ -70,9 +71,9 @@ soil_sample_df <- main_df %>%
   filter(
     !is.na(park_code),
     park_code != "",
-    !is.na(sample_date)
+    !is.na(sample_date),
+    !is.na(park_name)
   )
-
 
 # 8. Candidate environmental predictor columns
 
@@ -106,16 +107,10 @@ candidate_predictors <- c(
   "hydrogen_saturation_pct",
   "magnesium_saturation_pct",
   "potassium_saturation_pct",
-  "sodium_saturation_pct"
-)
+  "sodium_saturation_pct")
 
 candidate_predictors <- candidate_predictors[ 
   candidate_predictors %in% names(soil_sample_df)]
-
-message(
-  "Candidate predictors found: ",
-  paste(candidate_predictors, collapse = ", ")
-)
 
 # 9. Categorical predictors
 categorical_predictors <- c("soil_classification")
@@ -124,12 +119,12 @@ categorical_predictors <- categorical_predictors[
   categorical_predictors %in% names(soil_sample_df)]
 
 
-# 10. Create sample-level ARG richness dataframe
+# 10. Create sample level ARG richness data frame
 sample_richness_df <-soil_sample_df %>%
   filter( !is.na(amr_gene),amr_gene != "")%>%
   mutate(prism_tmean_c = (prism_tmin_c + prism_tmax_c)/2,
     gene_detected = !is.na(copies_per_microliter) & copies_per_microliter > 0) %>%
-  group_by(sample_date, park_code, tube_number, text_on_bag)%>%
+  group_by(sample_date, park_code, tube_number, text_on_bag, park_name, sample_month)%>%
   summarize(
     arg_richness = n_distinct(amr_gene[ gene_detected ]) ,
     total_arg_copies_per_microliter = sum(copies_per_microliter , na.rm = TRUE),
@@ -143,8 +138,68 @@ sample_richness_df <-soil_sample_df %>%
     .groups = "drop"
   )
 
-#11. Save sample-level ARG richness file
+#11. Save sample level ARG richness and summary file
 write_csv(sample_richness_df, richness_output_file)
 
+richness_summary <-sample_richness_df %>%
+  summarize(
+    n_samples = n(),
+    min_arg_richness = min(arg_richness, na.rm = TRUE),
+    median_arg_richness = median (arg_richness, na.rm = TRUE),
+    mean_arg_richness = mean(arg_richness , na.rm = TRUE),
+    max_arg_richness = max(arg_richness, na.rm = TRUE),
+    n_parks = n_distinct(park_name ),
+    n_sample_dates = n_distinct( sample_date)
+    )
+print(richness_summary)
+write_csv(richness_summary,
+  file.path(output_folder, 
+  "sample_level_arg_richness_summary.csv")
+  )
 
+
+#13 Check richness by park and montth
+
+
+
+richness_by_park <- sample_richness_df %>%
+  group_by( park_name) %>% summarise( n_samples = n(),
+    
+    mean_arg_richness = mean(
+      arg_richness,
+      na.rm = TRUE),
+    
+    median_arg_richness = median(
+      arg_richness,
+      na.rm = TRUE),
+    
+    min_arg_richness = min(
+      arg_richness,
+      na.rm = TRUE),
+    
+    max_arg_richness = max(
+      arg_richness, na.rm = TRUE),.groups = "drop") %>% arrange(desc(median_arg_richness))
+
+print(richness_by_park)
+
+richness_by_month <- sample_richness_df %>%
+  group_by(sample_month) %>%
+  
+  summarise(n_samples = n(),
+    
+    mean_arg_richness = mean(arg_richness,na.rm = TRUE),median_arg_richness = median( arg_richness,na.rm = TRUE),
+     min_arg_richness = min(arg_richness, na.rm =TRUE),max_arg_richness = max( arg_richness,na.rm = TRUE),
+    .groups ="drop") %>% arrange(sample_month 
+  )
+
+print(richness_by_month)
+
+write_csv(
+  richness_by_month,
+  file.path(
+    output_folder,
+    "sample_level_arg_richness_by_month.csv" )
+  )
+
+print(richness_by_month )
 
