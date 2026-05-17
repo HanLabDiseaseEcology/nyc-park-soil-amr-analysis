@@ -115,3 +115,23 @@ categorical_predictors <- c("soil_classification")
 
 categorical_predictors <- categorical_predictors[
   categorical_predictors %in% names(soil_sample_df)]
+
+
+# 10. Create sample-level ARG richness dataframe
+sample_richness_df <-soil_sample_df %>%
+  filter( !is.na(amr_gene),amr_gene != "")%>%
+  mutate(prism_tmean_c = (prism_tmin_c + prism_tmax_c)/2,
+    gene_detected = !is.na(copies_per_microliter) & copies_per_microliter > 0) %>%
+  group_by(sample_date, park_code, tube_number, text_on_bag)%>%
+  summarize(
+    arg_richness = n_distinct(amr_gene[ gene_detected ]) ,
+    total_arg_copies_per_microliter = sum(copies_per_microliter , na.rm = TRUE),
+    n_positive_gene_rows = sum(gene_detected),
+    n_unique_genes_reported = n_distinct( amr_gene),
+    
+    prism_precipitation_mm = first(na.omit(prism_precipitation_mm) ),
+    prism_tmin_c = first(na.omit(prism_tmin_c) ),
+    prism_tmax_c = first(na.omit( prism_tmax_c)),
+    prism_tmean_c = first(na.omit(prism_tmean_c) ),
+    .groups = "drop"
+  )
