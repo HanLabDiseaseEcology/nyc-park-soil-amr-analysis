@@ -10,6 +10,13 @@ output_folder <- "./data/arg_richness"
 
 richness_output_file <- file.path(output_folder, "sample_level_arg_richness.csv")
 
+dir.create( output_folder, recursive = TRUE, showWarnings = FALSE)
+
+write_csv(
+  sample_richness_df,
+  file.path(output_folder, "sample_level_arg_richness.csv")
+)
+
 # 3. Import main df
 
 main_df <- read_csv( input_file, show_col_types = FALSE)
@@ -135,3 +142,9 @@ sample_richness_df <-soil_sample_df %>%
     prism_tmean_c = first(na.omit(prism_tmean_c) ),
     .groups = "drop"
   )
+
+#11. Save sample-level ARG richness file
+write_csv(sample_richness_df, richness_output_file)
+
+
+
