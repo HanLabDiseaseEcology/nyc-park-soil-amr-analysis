@@ -12,10 +12,7 @@ richness_output_file <- file.path(output_folder, "sample_level_arg_richness.csv"
 
 dir.create( output_folder, recursive = TRUE, showWarnings = FALSE)
 
-write_csv(
-  sample_richness_df,
-  file.path(output_folder, "sample_level_arg_richness.csv")
-)
+
 
 # 3. Import main df
 
@@ -138,8 +135,12 @@ sample_richness_df <-soil_sample_df %>%
     .groups = "drop"
   )
 
+write_csv(
+  sample_richness_df, 
+  richness_output_file
+  )
 #11. Save sample level ARG richness and summary file
-write_csv(sample_richness_df, richness_output_file)
+
 
 richness_summary <-sample_richness_df %>%
   summarize(
@@ -159,8 +160,6 @@ write_csv(richness_summary,
 
 
 #13 Check richness by park and montth
-
-
 
 richness_by_park <- sample_richness_df %>%
   group_by( park_name) %>% summarise( n_samples = n(),
