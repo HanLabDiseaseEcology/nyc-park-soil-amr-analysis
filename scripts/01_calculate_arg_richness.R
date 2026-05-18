@@ -1,10 +1,6 @@
-# 1. Load libraries
-library(readr)
-library(dplyr)
-library(stringr)
-library(tibble)
+# 1. Load libraries and helper functions
+source("./required_packages/setup_packages_and_dependencies_R.R")
 source("./scripts/helper_functions.R")
-
 # 2. Set input and output file paths
 
 input_file <- "./data/amr_with_environmental_data_cleaned.csv"
@@ -27,16 +23,7 @@ main_df <- read_csv(
   input_file, 
   show_col_types = FALSE)
 
-# 4. Check required columns
-required_columns <- c(
-  "sample_date",
-  "park_code",
-  "tube_number",
-  "amr_gene",
-  "copies_per_microliter",
-  "park_name")
-
-# 5. Clean key columns
+# 4. Clean key columns
 
 main_df <- main_df %>%
   mutate(
@@ -48,13 +35,19 @@ main_df <- main_df %>%
     park_name = str_to_upper(str_trim(as.character(park_name))),
     sample_month = format(sample_date, "%Y-%m")
   )
-# 6. Identify controls and non regular soil samples
+
+if ("soil_classification" %in% names(main_df)) {
+  main_df <- main_df %>%
+    mutate(
+      soil_classification = str_to_upper(str_trim(as.character(soil_classification))))
+}
+# 5. Identify controls and non regular soil samples
 # Control names used in the data:
 #   PC1000
 #   PC100
 #   NC
 
-# RAT, TRASH and LANDFILL are removed because they are not regular soil
+# RAT, TRASH and LANDFILL are being removed because they are not regular soil
 # sampling locations for this analysis.
 
 main_df <- main_df %>%
@@ -68,7 +61,7 @@ main_df <- main_df %>%
       ~ str_detect(.x, "RAT|TRASH|LANDFILL"))
   )
 
-# 7. Keep only regular soil_chem samples that have all required data
+# 6. Keep only regular soil_chem samples that have all required data
 
 soil_sample_df <- main_df %>%
   filter(!is_control) %>%
@@ -85,7 +78,7 @@ if (all (c("prism_tmin_c" , "prism_tmax_c") %in% names(soil_sample_df ))) {
     mutate(prism_tmean_c = (prism_tmin_c + prism_tmax_c) / 2)
 }
 
-# 8. Candidate environmental predictor columns
+# 7 Candidate environmental predictor columns
 
 candidate_predictors <- c(
   "prism_precipitation_mm",
@@ -123,14 +116,30 @@ candidate_predictors <- c(
 candidate_predictors <- candidate_predictors[ 
   candidate_predictors %in% names(soil_sample_df)]
 
-# 9. Categorical predictors
+# 8 Categorical predictors
 categorical_predictors <- c("soil_classification")
 
 categorical_predictors <- categorical_predictors[
   categorical_predictors %in% names(soil_sample_df)]
 
 
-# 10. Create sample level ARG richness data frame
+#9 Predictor list for second step arg richness analysis
+predictor_list_df <- tibble(
+  predictor = c( candidate_predictors, categorical_predictors ),
+  predictor_type = c(
+    rep( "numeric",length(candidate_predictors)),
+    rep("categorical", length(categorical_predictors)))
+)
+
+write_csv(
+  predictor_list_df,
+  file.path(
+    output_folder,
+    "arg_richness_predictor_list.csv")
+)
+
+
+# 10 Predictor listy forarg richness analysis
 sample_richness_df <-soil_sample_df %>%
   filter( !is.na(amr_gene),amr_gene != "")%>%
   mutate(gene_detected = !is.na(copies_per_microliter) & copies_per_microliter > 0) %>%
@@ -150,7 +159,47 @@ write_csv(
   sample_richness_df, 
   richness_output_file
   )
-#11. Save sample level ARG richness and summary file
+
+# 11 Check predictor missingness and variation
+
+analysis_predictors <- c(
+  candidate_predictors,
+  categorical_predictors
+)
+
+predictor_missingness <- tibble(
+  predictor = analysis_predictors) %>%
+  mutate(
+    n_samples = nrow(sample_richness_df),
+    
+    n_missing = sapply(
+      predictor,
+      function(current_predictor) {
+        n_missing_values(sample_richness_df[[current_predictor]])}),
+    
+    n_non_missing = sapply(
+      predictor,
+      function(current_predictor) {
+        n_non_missing_values(sample_richness_df[[current_predictor]])}),
+    
+    proportion_missing = n_missing / n_samples,
+    
+    n_distinct_non_missing = sapply(
+      predictor,
+      function(current_predictor) {
+        n_distinct_non_missing_values(
+          sample_richness_df[[current_predictor]]) } )) %>%
+  arrange(desc(proportion_missing))
+
+print(predictor_missingness)
+
+write_csv(
+  predictor_missingness,
+  file.path(
+    output_folder,
+    "sample_level_arg_richness_predictor_missingness.csv")
+)
+#12 Save sample level ARG richness and summary file
 
 
 richness_summary <-sample_richness_df %>%
@@ -218,5 +267,8 @@ write_csv(
   )
 )
 
-#12 
+message(
+  "Finished creating sample-level ARG richness data: ",
+  richness_output_file
+)
 
