@@ -329,6 +329,7 @@ model_ranking <- map_dfr(
     model_family,
     aicc,
     delta_aicc,
+    aic,
     akaike_weight,
   )
 
@@ -340,7 +341,6 @@ write_csv(
 )
 
 # 12. Save coefficient table
-
 coefficient_table <- map_dfr(
   model_results,
   "model_coefficients") %>%
@@ -355,8 +355,7 @@ coefficient_table <- map_dfr(
         predictor,
         aicc_support_category ,
         delta_aicc,
-        akaike_weight,
-      ),
+        akaike_weight),
     by = "predictor") %>%
   dplyr::select(
     
@@ -377,4 +376,29 @@ print(coefficient_table)
 write_csv(
   coefficient_table,
   coefficient_output_file
+)
+
+
+# 13 Save interpretation table
+interpretation_table <- model_ranking %>%
+  dplyr::select(
+    predictor,
+    predictor_type,
+    model_family,
+    aicc_support_category,
+    n_samples,
+    n_genes_tested,
+    aic,
+    aicc,
+    delta_aicc,
+    akaike_weight
+  )
+print(interpretation_table)
+write_csv(
+  interpretation_table,
+  interpretation_output_file
+)
+message(
+  "Finished predictor ranking vs richness analysis: ",
+  model_ranking_output_file
 )
