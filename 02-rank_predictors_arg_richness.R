@@ -52,7 +52,7 @@ amr_with_env_vars <- read_csv(
   show_col_types = F
 )
 
-# 4. Set amr gene testing panel size? and check that richness does not exceed the number of tested genes
+# 4. Get amr gene testing panel size? and check that richness does not exceed the number of tested genes
 n_genes_tested <- length(unique(amr_with_env_vars$amr_gene))
 
 if (any(sample_richness_df$arg_richness > n_genes_tested, na.rm = T)) {
