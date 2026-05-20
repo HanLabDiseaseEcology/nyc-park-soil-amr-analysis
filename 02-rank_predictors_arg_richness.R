@@ -59,7 +59,7 @@ if (any(sample_richness_df$arg_richness > n_genes_tested, na.rm = T)) {
   stop("Some samples have a richness greater than n_genes_tested.")
 }
 
-# 5 Sumarize predictors missing and calculate cutoff for inclusion
+# 5 Summarize predictors missing and calculate cutoff for inclusion
 
 predictors_missingn_summary <- predictor_missingness %>%
   summarize(
@@ -317,9 +317,9 @@ model_ranking <- map_dfr(
     relative_likelihood = exp(-0.5 * delta_aicc),
     akaike_weight = relative_likelihood / sum(relative_likelihood, na.rm = TRUE),
     aicc_support_category = case_when(
-      delta_aicc <= 2 ~ "strongly relatice aicc support",
-      delta_aicc <= 7 ~ "moderate relatice aicc support",
-      TRUE ~ "weak relatice aicc support")) %>%
+      delta_aicc <= 2 ~ "strongly relative aicc support",
+      delta_aicc <= 7 ~ "moderate relative aicc support",
+      TRUE ~ "weak relative aicc support")) %>%
   dplyr::select(
     predictor,
     predictor_type,

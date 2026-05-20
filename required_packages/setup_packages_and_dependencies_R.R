@@ -6,7 +6,8 @@ required_packages <- c(
   "stringr",
   "tibble",
   "purrr",
-  "broom"
+  "broom",
+  "ggplot2"
 )
 
 for (package_name in required_packages) {
