@@ -2,15 +2,24 @@
 source("./required_packages/setup_packages_and_dependencies_R.R")
 source("./scripts/helper_functions.R")
 
-# 2 Set input and output file paths
+# 2 Set input and output file paths, check for required previous step inputs
 input_file_path <- "./data/arg_richness/sample_level_arg_richness.csv"
 
 predictor_list_file_path <- "./data/arg_richness/arg_richness_predictor_list.csv"
 predictor_missingness_file_path <- "./data/arg_richness/sample_level_arg_richness_predictor_missingness.csv"
-amr_with_env_data_file_path <- "./data/amr_with_environmental_data_cleaned.csv"
 
 output_folder <- "./data/predictor_rankings"
 
+required_input_files <-c(
+  input_file_path,
+  predictor_list_file_path,
+  predictor_missingness_file_path
+)
+
+if( any(!file.exists(required_input_files))){
+  stop("required inputs are missing. the file scripts/01_calculate_arg_richness.R should have been ran first.")
+}
+  
 dir.create(
   output_folder,
   recursive = T
@@ -47,17 +56,14 @@ predictor_missingness <- read_csv(
   show_col_types = F
 )
 
-amr_with_env_vars <- read_csv(
-  amr_with_env_data_file_path,
-  show_col_types = F
-)
 
 # 4. Set amr gene testing panel size? and check that richness does not exceed the number of tested genes
-n_genes_tested <- length(unique(amr_with_env_vars$amr_gene))
+n_genes_tested <- unique(sample_richness_df$n_unique_genes_reported)
 
-if (any(sample_richness_df$arg_richness > n_genes_tested, na.rm = T)) {
-  stop("Some samples have a richness greater than n_genes_tested.")
+if (length(n_genes_tested) != 1) {
+  stop("More than expected single value for n_unique_genes_reported")
 }
+n_genes_tested <- as.numeric(n_genes_tested)
 
 # 5 Summarize predictors missing and calculate cutoff for inclusion
 
@@ -317,7 +323,7 @@ model_ranking <- map_dfr(
     relative_likelihood = exp(-0.5 * delta_aicc),
     akaike_weight = relative_likelihood / sum(relative_likelihood, na.rm = TRUE),
     aicc_support_category = case_when(
-      delta_aicc <= 2 ~ "strongly relative aicc support",
+      delta_aicc <= 2 ~ "strong relative aicc support",
       delta_aicc <= 7 ~ "moderate relative aicc support",
       TRUE ~ "weak relative aicc support")) %>%
   dplyr::select(
@@ -358,9 +364,11 @@ coefficient_table <- map_dfr(
         akaike_weight),
     by = "predictor") %>%
   dplyr::select(
-    
     predictor,
     predictor_type,
+    term,
+    n_samples,
+    n_genes_tested,
     model_family,
     delta_aicc,
     aicc_support_category,
