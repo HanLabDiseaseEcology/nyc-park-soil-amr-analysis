@@ -51,7 +51,95 @@ message(
   required_input_file
 )
 
-# 2 List the scripts in the order they should run
+# 2 Create a test-run folder with the current date and time
+
+test_run_name <- paste0(
+  "arg_richness_test_",
+  format(
+    Sys.time(),
+    "%Y-%m-%d_%H-%M-%S"
+  )
+)
+
+test_run_folder <- file.path(
+  project_root,
+  "test_runs",
+  test_run_name
+)
+dir.create(
+  test_run_folder,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+if (!dir.exists(test_run_folder)) {
+  stop(
+    paste0(
+      "The test run folder could not be created:\n",
+      test_run_folder
+    )
+  )
+}
+
+message(
+  "Created test-run folder: ",
+  test_run_folder
+)
+
+# 3 Copy the input data and code into the test-run folder
+
+test_data_folder <- file.path(
+  test_run_folder,
+  "data"
+)
+
+dir.create(
+  test_data_folder,
+  recursive = TRUE,
+  showWarnings = FALSE
+)
+
+input_file_copied <- file.copy(
+  from = required_input_file,
+  to = file.path(
+    test_data_folder,
+    required_input_file_name
+  )
+)
+
+if (!input_file_copied) {
+  stop("The input CSV could not be copied into the test-run folder.")
+}
+
+
+
+scripts_folder_copied <- file.copy(
+  from = file.path(
+    project_root,
+    "scripts"
+  ),
+  to = test_run_folder,
+  recursive = TRUE
+)
+
+required_packages_folder_copied <- file.copy(
+  from = file.path(
+    project_root,
+    "required_packages"
+  ),
+  to = test_run_folder,
+  recursive = TRUE
+)
+
+if (
+  !scripts_folder_copied ||
+  !required_packages_folder_copied
+) {
+  stop("One or more required code files could not be copied.")
+}
+
+
+# 4 List the scripts in the order they should run
 
 analysis_scripts <- c(
   "./scripts/01_calculate_arg_richness.R",
@@ -61,12 +149,12 @@ analysis_scripts <- c(
 )
 
 
-# 3 Check that all scripts exist
+# 5 Check that all copied scripts exist
 
 missing_scripts <- analysis_scripts[
   !file.exists(
     file.path(
-      project_root,
+      test_run_folder,
       analysis_scripts
     )
   )
@@ -75,7 +163,7 @@ missing_scripts <- analysis_scripts[
 if (length(missing_scripts) > 0) {
   stop(
     paste0(
-      "The following scripts are missing:\n",
+      "The following scripts are missing from the test-run folder:\n",
       paste(
         missing_scripts,
         collapse = "\n"
@@ -85,7 +173,7 @@ if (length(missing_scripts) > 0) {
 }
 
 
-# 4 Find the Rscript program
+# 6 Find the Rscript program
 
 rscript_executable <- file.path(
   R.home("bin"),
@@ -97,11 +185,11 @@ rscript_executable <- file.path(
 )
 
 
-# 5 Run all scripts from project folder
+# 7 Run all scripts from test-run folder
 
 original_working_directory <- getwd()
 
-setwd(project_root)
+setwd(test_run_folder)
 
 for (script_path in analysis_scripts) {
   
@@ -119,7 +207,10 @@ for (script_path in analysis_scripts) {
     stop(
       paste0(
         "The pipeline stopped because this script failed:\n",
-        script_path
+        script_path,
+        "\n\n",
+        "Test files created before the error remain in:\n",
+        test_run_folder
       )
     )
   }
@@ -127,55 +218,11 @@ for (script_path in analysis_scripts) {
   message("Finished: ", script_path)
 }
 
-
-# 6 Render the Quarto document
-
-quarto_document <- file.path(
-  "outputs",
-  "reports",
-  "arg_richness_adjusted_aicc_results.qmd"
-)
-
-if (!file.exists(quarto_document)) {
-  setwd(original_working_directory)
-  
-  stop(
-    paste0(
-      "The Quarto document was not found:\n",
-      quarto_document
-    )
-  )
-}
-
-message("")
-message("Rendering: ", quarto_document)
-
-quarto_status <- system2(
-  command = "quarto",
-  args = c(
-    "render",
-    shQuote(quarto_document)
-  )
-)
-
-if (quarto_status != 0) {
-  setwd(original_working_directory)
-  
-  stop(
-    paste0(
-      "The Quarto document could not be rendered:\n",
-      quarto_document
-    )
-  )
-}
-
-message("Finished rendering: ", quarto_document)
-
 setwd(original_working_directory)
 
 
-# 7 ompletion message
+# 8 ompletion message
 
 message("")
-message("The ARG richness pipeline completed successfully.")
-message("Outputs were saved in the project data and outputs folders.")
+message("The ARG richness test pipeline completed successfully.")
+message("Test outputs were saved in: ", test_run_folder)
