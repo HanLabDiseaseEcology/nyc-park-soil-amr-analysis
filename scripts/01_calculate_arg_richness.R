@@ -1,20 +1,29 @@
 # 1. Load libraries and helper functions
 source("./required_packages/setup_packages_and_dependencies_R.R")
 source("./scripts/helper_functions.R")
+
 # 2. Set input and output file paths
 
 input_file <- "./data/amr_with_environmental_data_cleaned.csv"
 output_folder <- "./data/arg_richness"
 
-richness_output_file <- file.path(
-  output_folder, 
-  "sample_level_arg_richness.csv"
-)
-
+if (!file.exists(input_file)) {
+  stop(
+    paste0(
+      "input file not found: ",
+      input_file,
+      "\nRun the pipeline setup or place the file in the data folder."))
+  }
+    
 dir.create( 
   output_folder, 
   recursive = TRUE, 
   showWarnings = FALSE
+)
+
+richness_output_file <- file.path(
+  output_folder, 
+  "sample_level_arg_richness.csv"
 )
 
 # 3. Import main df

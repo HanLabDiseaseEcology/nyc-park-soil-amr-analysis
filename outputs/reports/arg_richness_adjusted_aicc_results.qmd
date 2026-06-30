@@ -1,0 +1,341 @@
+---
+title: "ARG Richness Predictors Adjusted for Park and Month"
+author: "virnaliz cruz"
+format: pdf
+header-includes:
+  - \usepackage{graphicx}
+editor: visual
+execute:
+  echo: false
+---
+
+```{r}
+#| include: false
+
+adjusted_ranking_file <- file.path(
+  "..",
+  "..",
+  "data",
+  "predictor_rankings",
+  "arg_richness_predictor_adjusted_aicc_model_ranking.csv"
+)
+
+if (!file.exists(adjusted_ranking_file)) {
+  stop(
+    paste0(
+      "The adjusted AICc ranking file was not found:\n",
+      adjusted_ranking_file,
+      "\n\nRun the ARG richness pipeline first."
+    )
+  )
+}
+
+adjusted_model_ranking <- readr::read_csv(
+  adjusted_ranking_file,
+  show_col_types = FALSE
+)
+
+best_approximating_models <- adjusted_model_ranking |>
+  dplyr::filter(
+    adjusted_delta_aicc < 2
+  ) |>
+  dplyr::arrange(
+    adjusted_delta_aicc
+  ) |>
+  dplyr::pull(
+    predictor
+  )
+
+best_approximating_models <- tools::toTitleCase(
+  gsub(
+    "_",
+    " ",
+    best_approximating_models
+  )
+)
+
+best_approximating_models_text <- paste(
+  best_approximating_models,
+  collapse = ", "
+)
+
+supported_predictors <- adjusted_model_ranking |>
+  dplyr::filter(
+    delta_aicc_from_adjusted_null < -2
+  ) |>
+  dplyr::arrange(
+    delta_aicc_from_adjusted_null
+  ) |>
+  dplyr::transmute(
+    Predictor = tools::toTitleCase(
+      gsub("_", " ", predictor)
+    ),
+    Support = dplyr::case_when(
+      grepl(
+        "^strong",
+        adjusted_aicc_support_category
+      ) ~ "Strong",
+      grepl(
+        "^moderate",
+        adjusted_aicc_support_category
+      ) ~ "Moderate",
+      grepl(
+        "^weak",
+        adjusted_aicc_support_category
+      ) ~ "Weak",
+      TRUE ~ adjusted_aicc_support_category
+    ),
+    `Adj. AIC` = round(adjusted_aic, 2),
+    `Adj. AICc` = round(adjusted_aicc, 2),
+    `Adj. Delta AICc` = round(adjusted_delta_aicc, 2),
+    `Akaike Weight` = round(adjusted_akaike_weight, 3),
+    `Null AIC` = round(adjusted_null_aic, 2),
+    `Null AICc` = round(adjusted_null_aicc, 2),
+    `Delta AICc vs. Null` = round(
+      delta_aicc_from_adjusted_null,
+      2
+    )
+  )
+
+top_models <- adjusted_model_ranking |>
+  dplyr::filter(
+    adjusted_delta_aicc < 2
+  ) |>
+  dplyr::arrange(
+    adjusted_delta_aicc
+  ) |>
+  dplyr::transmute(
+    predictor,
+    predictor_label = gsub(
+      "_",
+      " ",
+      predictor
+    ),
+    adjusted_delta_aicc,
+    adjusted_akaike_weight,
+    weight_percent = adjusted_akaike_weight * 100
+  )
+
+top_models_combined_weight <- sum(
+  top_models$adjusted_akaike_weight,
+  na.rm = TRUE
+) * 100
+
+if (nrow(top_models) >= 2) {
+  
+  top_model_name <- tools::toTitleCase(
+    top_models$predictor_label[1]
+  )
+  
+  runner_up_name <- tools::toTitleCase(
+    top_models$predictor_label[2]
+  )
+  
+  top_model_evidence_ratio <-
+    top_models$adjusted_akaike_weight[1] /
+    top_models$adjusted_akaike_weight[2]
+}
+
+null_evidence_table <- adjusted_model_ranking |>
+  dplyr::filter(
+    delta_aicc_from_adjusted_null < -2
+  ) |>
+  dplyr::arrange(
+    delta_aicc_from_adjusted_null
+  ) |>
+  dplyr::transmute(
+    Predictor = tools::toTitleCase(
+      gsub("_", " ", predictor)
+    ),
+    `Evidence Ratio of Improvement` = round(
+      exp(
+        -delta_aicc_from_adjusted_null / 2
+      ),
+      1
+    )
+  )
+```
+
+```{r}
+#| echo: false
+#| results: asis
+if (nrow(supported_predictors) == 0) {
+  cat(
+    "No predictors met the delta AICc threshold of less than -2."
+  )
+} else {
+  table_latex <- knitr::kable(
+    supported_predictors,
+    format = "latex",
+    booktabs = TRUE,
+    align = c(
+      "l",
+      "l",
+      "r",
+      "r",
+      "r",
+      "r",
+      "r",
+      "r",
+      "r"
+    )
+  )
+  cat("\\begin{center}\n")
+  cat("\\resizebox{\\textwidth}{!}{%\n")
+  cat(table_latex)
+  cat("\n}\n")
+  cat("\\end{center}\n")
+}
+```
+
+## Justifying $\Delta\mathrm{AICc}$
+
+We justify the second-order-bias-corrected Akaike Information Criterion ($AICc$) for model ranking because our sample size is small relative to the number of parameters ($n=54$). $AICc$ is recommended whenever the $n/K$ ratio is less than 40 for the most complex model in the set. Failing to use the second-order correction in small samples often leads to overfitting.
+
+## Interpreting $\Delta\mathrm{AICc}$
+
+$\Delta\mathrm{AICc}$ is the difference between each model's $AICc$ and the minimum $AICc$ in the set:
+
+$$
+\Delta_i = \mathrm{AICc}_i - \mathrm{AICc}_{\min}
+$$
+
+This standardizes the results so that the best model has a $\Delta\mathrm{AICc}$ of 0, forcing all other models have positive values representing their relative information loss compared to the best model. The larger the value of a model the less plausible is it that it is the best model to approximate our data.
+
+Models can be interpreted using the following rough guidelines(Raftery 1996):
+
+$$
+\begin{aligned}
+\Delta_i \leq 2
+&\quad \text{Substantial support} \\
+4 \leq \Delta_i \leq 7
+&\quad \text{Considerably less support} \\
+\Delta_i > 10
+&\quad \text{Essentially no support}
+\end{aligned}
+$$
+
+In our data, the models that best approximate the information contained in the data are: `r best_approximating_models_text`
+
+## Likelihood of being the "best" model
+
+```{r}
+#| echo: false
+#| results: asis
+
+cat(
+  "Akaike weight is the estimated probability that a specific model is the best information approximating model in the candidate set, given our data and the models being compared.\n\n"
+)
+
+cat(
+  'Looking at our strongly supported models, with a $\\Delta\\mathrm{AICc} < 2$:\n\n'
+)
+
+if (nrow(top_models) == 0) {
+  
+  cat(
+    "No models had an adjusted $\\Delta\\mathrm{AICc}$ below 2.\n"
+  )
+  
+} else {
+  
+  for (i in seq_len(nrow(top_models))) {
+    
+    cat(
+      paste0(
+        "- **",
+        top_models$predictor_label[i],
+        " (",
+        sprintf(
+          "%.3f",
+          top_models$adjusted_akaike_weight[i]
+        ),
+        "):** There is approximately a ",
+        sprintf(
+          "%.1f",
+          top_models$weight_percent[i]
+        ),
+        "% probability, making it the best approximating model in the candidate set.\n"
+      )
+    )
+  }
+  
+  if (nrow(top_models) >= 2) {
+    
+    cat(
+      paste0(
+        "\n\n**Evidence ratio:** The ",
+        top_model_name,
+        " model has approximately ",
+        sprintf(
+          "%.2f",
+          top_model_evidence_ratio
+        ),
+        " times as much support as the ",
+        runner_up_name,
+        " model, based on their Akaike weights.\n\n"
+      )
+    )
+  }
+  
+  number_of_top_models <- nrow(top_models)
+  
+  model_word <- ifelse(
+    number_of_top_models == 1,
+    "model",
+    "models"
+  )
+  
+  leader_name <- top_models$predictor_label[1]
+  
+  cat(
+    paste0(
+      "**Combined evidence:** Together, these ",
+      number_of_top_models,
+      " ",
+      model_word,
+      " account for approximately ",
+      sprintf(
+        "%.1f",
+        top_models_combined_weight
+      ),
+      "% of the total Akaike weight in the candidate set. ",
+      "Although ",
+      leader_name,
+      " has the highest individual weight, the support is distributed across multiple models."
+    )
+  )
+}
+```
+
+## Null model comparison as a baseline sanity check
+
+The adjusted null model (contains only the control variables park and month, representing the background "noise" or unexplained variation associated with location and seasonality.
+
+The value `delta_aicc_from_adjusted_null` ($\mathrm{AICc}_{\mathrm{model}}-\mathrm{AICc}_{\mathrm{null}}$) measures the gain in structural information provided by adding a single biological predictor to these controls. A negative delta indicates that the biological predictor improves the model's ability to approximate the information in the data.
+
+To quantify the strength of these improvements, we calculated evidence ratios which compare how much our models gain in structural information (structure of relationships, the estimates of model parameters, and the components of variance . What our models are attemptint to approximate) when compared to the null.
+
+```{r}
+#| echo: false
+
+knitr::kable(
+  null_evidence_table,
+  format = "latex",
+  booktabs = TRUE,
+  align = c(
+    "l",
+    "r"
+  ),
+  caption = paste(
+    "Relative support for each predictor model compared",
+    "with its corresponding adjusted null model."
+  )
+)
+```
+
+The authors warn of this as particularly limited and often superfluous because, in many cases, we already know the null is false
+
+## Interpretation and next steps
+
+Because multiple candidate models had $\Delta\mathrm{AICc} < 2$, the Akaike weights and ratios suggest relative support for several competing single predictor models (after adjustment for park and month). Because we evaluated each environmental predictor separately these results do not determine that the predictors have independent, additive, or joint biological effects. An analysis comparing a small set of biologically motivated multipredictor models would be a good next step.
